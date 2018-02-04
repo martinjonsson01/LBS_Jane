@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
 
@@ -29,7 +30,7 @@ namespace DiscordBot_Jane.Services
             _commands.Log += OnLogAsync;
         }
 
-        private Task OnLogAsync(Discord.LogMessage msg)
+        public Task LogAsync(LogSeverity severity, string source, string message)
         {
             // Create the log directory if it doesn't exist.
             if (!Directory.Exists(_logDirectory))
@@ -39,12 +40,17 @@ namespace DiscordBot_Jane.Services
                 File.Create(_logFile).Dispose();
 
             string logText =
-                $"{DateTime.UtcNow:hh:mm:ss} [{msg.Severity}] {msg.Source}: {msg.Exception?.ToString() ?? msg.Message}";
+                $"{DateTime.UtcNow:hh:mm:ss} [{severity}] {source}: {message}";
             // Write the log text to a file.
             File.AppendAllText(_logFile, logText + "\n");
 
             // Write the log text to the console.
             return Console.Out.WriteLineAsync(logText);
+        }
+
+        private Task OnLogAsync(LogMessage msg)
+        {
+            return LogAsync(msg.Severity, msg.Source, msg.Exception?.ToString() ?? msg.Message);
         }
     }
 }

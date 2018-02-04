@@ -10,6 +10,7 @@ using Discord.Commands;
 
 namespace DiscordBot_Jane.Modules
 {
+    [Name("Hjälp")]
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
         private readonly CommandService _service;
@@ -19,13 +20,17 @@ namespace DiscordBot_Jane.Modules
             _service = service;
         }
 
-        [Command("help")]
+        [Command("help"), Alias("hjälp")]
         public async Task HelpAsync()
         {
+            // Delete the "help" command message from the user.
+            if (!Context.IsPrivate)
+                await Context.Message.DeleteAsync();
+
             var builder = new EmbedBuilder()
             {
                 Color = new Color(114, 137, 218),
-                Description = "These are the commands you can use"
+                Description = "Detta är vad jag kan göra:"
             };
 
             foreach (var module in _service.Modules)
@@ -35,7 +40,7 @@ namespace DiscordBot_Jane.Modules
                 {
                     var result = await cmd.CheckPreconditionsAsync(Context);
                     if (result.IsSuccess)
-                        description += $"{Config.Prefix}{cmd.Aliases.First()}\n";
+                        description += $"{Config.Trigger} {cmd.Aliases.First()}\n";
                 }
 
                 if (!string.IsNullOrWhiteSpace(description))
@@ -53,21 +58,26 @@ namespace DiscordBot_Jane.Modules
             await Context.User.SendMessageAsync("", false, builder.Build());
         }
 
+        [Command("help"), Alias("hjälp")]
         public async Task HelpAsync(string command)
         {
+            // Delete the "help" command message from the user.
+            if (!Context.IsPrivate)
+                await Context.Message.DeleteAsync();
+
             var result = _service.Search(Context, command);
 
             if (!result.IsSuccess)
             {
                 //await ReplyAsync($"Sorry, I couldn't find a command like **{command}**.");
-                await Context.User.SendMessageAsync($"Sorry, I couldn't find a command like **{command}**.");
+                await Context.User.SendMessageAsync($"Verkar som att jag inte kunde hitta något kommando som liknar **{command}**.");
                 return;
             }
 
             var builder = new EmbedBuilder()
             {
                 Color = new Color(114, 137, 218),
-                Description = $"Here are some commands like **{command}**"
+                Description = $"Här är några kommandon som liknar **{command}**:"
             };
 
             foreach (var match in result.Commands)
@@ -77,8 +87,8 @@ namespace DiscordBot_Jane.Modules
                 builder.AddField(x =>
                 {
                     x.Name = string.Join(", ", cmd.Aliases);
-                    x.Value = $"Parameters: {string.Join(", ", cmd.Parameters.Select(p => p.Name))}\n" +
-                              $"Summary: {cmd.Summary}";
+                    x.Value = $"Parametrar: {string.Join(", ", cmd.Parameters.Select(p => p.Name))}\n" +
+                              $"Sammanfattning: {cmd.Summary}";
                     x.IsInline = false;
                 });
             }
