@@ -64,7 +64,7 @@ namespace DiscordBot_Jane.Modules
             // Delete the "help" command message from the user.
             if (!Context.IsPrivate)
                 await Context.Message.DeleteAsync();
-
+            
             var result = _service.Search(Context, command);
 
             if (!result.IsSuccess)

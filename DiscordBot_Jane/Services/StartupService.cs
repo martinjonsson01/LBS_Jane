@@ -24,10 +24,16 @@ namespace DiscordBot_Jane.Services
 
         public async Task StartAsync()
         {
+            // Notify users that bot is online when connected to guild.
+            _discord.GuildAvailable += async guild => await guild.TextChannels.First().SendMessageAsync("I'm online!");
+
             // Login to discord.
             await _discord.LoginAsync(TokenType.Bot, Config.DiscordToken);
             // Connect to the websocket.
             await _discord.StartAsync();
+
+            // Set up "currently playing" game.
+            await _discord.SetGameAsync("Siggeroid");
 
             // Load commands and modules into the command service.
             await _commands.AddModulesAsync(Assembly.GetEntryAssembly());

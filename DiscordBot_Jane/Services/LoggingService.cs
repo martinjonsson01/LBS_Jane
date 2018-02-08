@@ -32,6 +32,10 @@ namespace DiscordBot_Jane.Services
 
         public Task LogAsync(LogSeverity severity, string source, string message)
         {
+            // If message to be logged is debug message and program is not in debug mode, don't log it.
+            if (severity == LogSeverity.Debug && !Program.InDebugMode)
+                return null;
+
             // Create the log directory if it doesn't exist.
             if (!Directory.Exists(_logDirectory))
                 Directory.CreateDirectory(_logDirectory);
@@ -40,7 +44,7 @@ namespace DiscordBot_Jane.Services
                 File.Create(_logFile).Dispose();
 
             string logText =
-                $"{DateTime.UtcNow:hh:mm:ss} [{severity}] {source}: {message}";
+                $"{DateTime.Now:hh:mm:ss} [{severity}] {source}: {message}";
             // Write the log text to a file.
             File.AppendAllText(_logFile, logText + "\n");
 

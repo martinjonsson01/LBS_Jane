@@ -38,18 +38,20 @@ namespace DiscordBot_Jane
                     LogLevel = LogSeverity.Verbose
                 }))
                 .AddSingleton<CommandHandler>() // Add remaining services to the provider.
-                .AddSingleton<LoggingService>()
-                .AddSingleton<StartupService>()
-                .AddSingleton<JaneClassroomService>()
+                .AddSingleton<LoggingService>() // Allows us to log messages to the log file and console.
+                .AddSingleton<StartupService>() // Starts up the bot.
+                .AddSingleton<ChannelService>() // Handles creating required channels.
+                .AddSingleton<JaneClassroomService>() // Handles all interactions with Google Classroom.
                 .AddSingleton<Random>(); // You get better random with a single instance than by creating a new one every time you need it.
 
             // Create the service provider.
             var provider = services.BuildServiceProvider();
 
-            // Initialize the logging service, startup service, and command handler.
+            // Initialize the logging service, startup service, and command handler (along with other services).
             provider.GetRequiredService<LoggingService>();
-            provider.GetRequiredService<JaneClassroomService>();
             await provider.GetRequiredService<StartupService>().StartAsync();
+            provider.GetRequiredService<ChannelService>();
+            provider.GetRequiredService<JaneClassroomService>();
             provider.GetRequiredService<CommandHandler>();
 
             // Prevent the application from closing.

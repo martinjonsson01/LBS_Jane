@@ -140,6 +140,7 @@
     <Reference Include="System.Diagnostics.DiagnosticSource, Version=4.0.2.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Diagnostics.DiagnosticSource.4.4.1\lib\net46\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
+    <Reference Include="System.Drawing" />
     <Reference Include="System.Globalization.Calendars, Version=4.0.2.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
       <HintPath>..\packages\System.Globalization.Calendars.4.3.0\lib\net46\System.Globalization.Calendars.dll</HintPath>
     </Reference>
@@ -200,14 +201,19 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config.cs" />
+    <Compile Include="CourseAnnouncementEqualityComparer.cs" />
+    <Compile Include="CourseWorkEqualityComparer.cs" />
     <Compile Include="Modules\HelpModule.cs" />
     <Compile Include="Modules\ModerationModule.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\ClassroomService.cs" />
+    <Compile Include="Services\ChannelService.cs" />
+    <Compile Include="Services\JaneClassroomService.cs" />
     <Compile Include="Services\CommandHandler.cs" />
     <Compile Include="Services\LoggingService.cs" />
     <Compile Include="Services\StartupService.cs" />
+    <Compile Include="Utils\ClassroomUtils.cs" />
+    <Compile Include="Utils\EqualityUtils.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
