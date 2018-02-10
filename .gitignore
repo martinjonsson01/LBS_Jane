@@ -303,3 +303,4 @@ __pycache__/
 _configuration.json
 # Google secret
 DiscordBot_Jane/client_secret.json
+*.json
