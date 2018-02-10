@@ -302,4 +302,4 @@ __pycache__/
 # Discord bot configuration file
 _configuration.json
 # Google secret
-client_secret.json
+DiscordBot_Jane/client_secret.json
