@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
+using Microsoft.Extensions.Configuration;
 
 namespace DiscordBot_Jane.Modules
 {
@@ -14,10 +15,12 @@ namespace DiscordBot_Jane.Modules
     public class HelpModule : ModuleBase<SocketCommandContext>
     {
         private readonly CommandService _service;
+        private readonly IConfigurationRoot _config;
 
-        public HelpModule(CommandService service)
+        public HelpModule(CommandService service, IConfigurationRoot config)
         {
             _service = service;
+            _config = config;
         }
 
         [Command("help"), Alias("hjälp")]
@@ -40,7 +43,7 @@ namespace DiscordBot_Jane.Modules
                 {
                     var result = await cmd.CheckPreconditionsAsync(Context);
                     if (result.IsSuccess)
-                        description += $"{Config.Trigger} {cmd.Aliases.First()}\n";
+                        description += $"{_config["trigger"]} {cmd.Aliases.First()}\n";
                 }
 
                 if (!string.IsNullOrWhiteSpace(description))

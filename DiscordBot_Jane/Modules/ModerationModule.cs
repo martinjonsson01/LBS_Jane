@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.Configuration;
 
 namespace DiscordBot_Jane.Modules
 {
@@ -13,6 +14,13 @@ namespace DiscordBot_Jane.Modules
     [RequireContext(ContextType.Guild)]
     public class ModerationModule : ModuleBase<SocketCommandContext>
     {
+        private readonly IConfigurationRoot _config;
+
+        public ModerationModule(IConfigurationRoot config)
+        {
+            _config = config;
+        }
+
         [Command("kick"), Alias("kicka")]
         [Summary("Kicka den specifierade användaren.")]
         [RequireUserPermission(GuildPermission.KickMembers)]
@@ -37,7 +45,7 @@ namespace DiscordBot_Jane.Modules
         public async Task Ban([Remainder]SocketGuildUser user)
         {
             await ReplyAsync($"hejdå {user.Mention} :wave:");
-            await Context.Guild.AddBanAsync(user, Config.BanPruneDays);
+            await Context.Guild.AddBanAsync(user, _config.GetValue("ban_prune_days", 7));
         }
 
         [Command("ban"), Alias("banna")]
@@ -46,7 +54,7 @@ namespace DiscordBot_Jane.Modules
         public async Task Ban(SocketGuildUser user, string reason)
         {
             await ReplyAsync($"hejdå {user.Mention} :wave:");
-            await Context.Guild.AddBanAsync(user, Config.BanPruneDays, reason);
+            await Context.Guild.AddBanAsync(user, _config.GetValue("ban_prune_days", 7), reason);
         }
     }
 }

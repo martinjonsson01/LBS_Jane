@@ -17,6 +17,7 @@ using Google.Apis.Requests;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 using Google.Protobuf.WellKnownTypes;
+using Microsoft.Extensions.Configuration;
 using Color = Discord.Color;
 
 namespace DiscordBot_Jane.Services
@@ -33,6 +34,7 @@ namespace DiscordBot_Jane.Services
         private readonly LoggingService _logger;
         private readonly IServiceProvider _provider;
         private readonly ChannelService _channelService;
+        private readonly IConfigurationRoot _config;
 
         private static readonly string[] Scopes =
         {
@@ -53,13 +55,15 @@ namespace DiscordBot_Jane.Services
             CommandService commands,
             LoggingService logger,
             IServiceProvider provider,
-            ChannelService channelService)
+            ChannelService channelService,
+            IConfigurationRoot config)
         {
             _discord = discord;
             _commands = commands;
             _logger = logger;
             _provider = provider;
             _channelService = channelService;
+            _config = config;
             _discord.Ready += StartPollDataFromClassroomTask;
         }
 
@@ -142,7 +146,8 @@ namespace DiscordBot_Jane.Services
 
                     try
                     {
-                        await Task.Delay(TimeSpan.FromMinutes(Config.ClassroomCallIntervalMinutes), _token);
+                        double result = double.TryParse(_config["classroom_interval_minutes"], out result) ? result : 1;
+                        await Task.Delay(TimeSpan.FromMinutes(result), _token);
                     }
                     catch (TaskCanceledException e)
                     {
@@ -173,18 +178,16 @@ namespace DiscordBot_Jane.Services
                 {
                     footer
                         .WithText("Inlämning")
-                        .WithIconUrl(Config.IconWhiteClock);
+                        .WithIconUrl(_config["urls:IconWhiteClock"]);
                 })
-                .WithThumbnailUrl(Config.IconWhiteTask)
+                .WithThumbnailUrl(_config["urls:IconWhiteTask"])
                 .WithAuthor(author =>
                 {
+                    var teacherImage = _config[$"classroom_courses:{course.Name}:TeacherImage"] ?? $"https:{teacherPhotoUrl}";
                     author
                         .WithName($"{course.Name} - {course.Section}")
                         .WithUrl(course.AlternateLink)
-                        .WithIconUrl(
-                            Config.CourseTeacherImageDictionary.ContainsKey(course.Name)
-                            ? Config.CourseTeacherImageDictionary[course.Name] // If it contains key.
-                            : $"https:{teacherPhotoUrl}"); // If it doesn't.
+                        .WithIconUrl(teacherImage);
                 });
 
             // Add materials as fields.
@@ -195,7 +198,7 @@ namespace DiscordBot_Jane.Services
             var embed = builder.Build();
 
             // Get mentions of all roles that should be mentioned.
-            string announceMessage = GetAnnounceMessageWithRolesMention(course);
+            string announceMessage = GetAnnounceMessageWithRolesMention(course, guild);
 
             // Announce new course work.
             await AnnounceNews(guild, embed, announceMessage);
@@ -267,18 +270,16 @@ namespace DiscordBot_Jane.Services
                 {
                     footer
                         .WithText("Lades upp")
-                        .WithIconUrl(Config.IconWhiteClock);
+                        .WithIconUrl(_config["urls:IconWhiteClock"]);
                 })
-                .WithThumbnailUrl(Config.IconWhiteAnnouncement)
+                .WithThumbnailUrl(_config["urls:IconWhiteAnnouncement"])
                 .WithAuthor(author =>
                 {
+                    var teacherImage = _config[$"classroom_courses:{course.Name}:TeacherImage"] ?? $"https:{teacherPhotoUrl}";
                     author
                         .WithName($"{course.Name} - {course.Section}")
                         .WithUrl(course.AlternateLink)
-                        .WithIconUrl(
-                            Config.CourseTeacherImageDictionary.ContainsKey(course.Name)
-                            ? Config.CourseTeacherImageDictionary[course.Name] // If it contains key.
-                            : $"https:{teacherPhotoUrl}"); // If it doesn't.
+                        .WithIconUrl(teacherImage);
                 });
 
             // Add materials as fields.
@@ -289,7 +290,7 @@ namespace DiscordBot_Jane.Services
             var embed = builder.Build();
 
             // Get mentions of all roles that should be mentioned.
-            string announceMessage = GetAnnounceMessageWithRolesMention(course);
+            string announceMessage = GetAnnounceMessageWithRolesMention(course, guild);
 
             // Announce new course announcement.
             await AnnounceNews(guild, embed, announceMessage);
@@ -298,12 +299,12 @@ namespace DiscordBot_Jane.Services
             //await LinkMaterialsNew(newAnnouncement.Materials, guild.GetTextChannel(397542059596316673));
         }
 
-        private string GetAnnounceMessageWithRolesMention(Course course)
+        private string GetAnnounceMessageWithRolesMention(Course course, SocketGuild guild)
         {
-            var announceMessage = $"{Config.NewAnnouncementMessage} från {course.Name}";
-            foreach (var role in Config.CourseMentionRoles(course.Name, _discord.GetGuild(Config.GuildId)))
+            var announceMessage = $"{_config["messages:NewAnnouncement"]} från {course.Name}";
+            foreach (var role in Config.CourseMentionRoles(course.Name, guild, _config))
             {
-                if (role.Id == _discord.GetGuild(Config.GuildId).Id)
+                if (role.Id == guild.Id)
                     announceMessage += " @everyone";
                 else
                     announceMessage += $" {role.Mention}";
@@ -381,7 +382,7 @@ namespace DiscordBot_Jane.Services
                             // Log the latest course work if in debug mode.
                             if (Program.InDebugMode)
                             {
-                                var firstCourseWorkTitle = Config.ClassroomNoCourseWork;
+                                var firstCourseWorkTitle = _config["messages:ClassroomNoCourseWork"];
                                 if (courseWorkResponse.CourseWork?[0] != null)
                                     firstCourseWorkTitle = courseWorkResponse.CourseWork[0].Title;
 
@@ -409,7 +410,7 @@ namespace DiscordBot_Jane.Services
                             // Log the latest announcement if in debug mode.
                             if (Program.InDebugMode)
                             {
-                                var firstCourseWorkTitle = Config.ClassroomNoCourseAnnouncements;
+                                var firstCourseWorkTitle = _config["messages:ClassroomNoCourseAnnouncements"];
                                 if (courseAnnouncementsResponse.Announcements?[0] != null)
                                     firstCourseWorkTitle =
                                         courseAnnouncementsResponse.Announcements[0].Text;

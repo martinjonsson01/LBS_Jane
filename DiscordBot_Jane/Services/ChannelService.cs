@@ -9,6 +9,7 @@ using Discord.Commands;
 using Discord.Rest;
 using Discord.WebSocket;
 using Google.Apis.Classroom.v1;
+using Microsoft.Extensions.Configuration;
 
 namespace DiscordBot_Jane.Services
 {
@@ -23,32 +24,32 @@ namespace DiscordBot_Jane.Services
         private readonly CommandService _commands;
         private readonly LoggingService _logger;
         private readonly IServiceProvider _provider;
+        private readonly IConfigurationRoot _config;
         
         public ChannelService(
             DiscordSocketClient discord,
             CommandService commands,
             LoggingService logger,
-            IServiceProvider provider)
+            IServiceProvider provider,
+            IConfigurationRoot config)
         {
             _discord = discord;
             _commands = commands;
             _logger = logger;
             _provider = provider;
+            _config = config;
             
             _discord.GuildAvailable += OnGuildAvailable;
         }
 
         private async Task OnGuildAvailable(SocketGuild guild)
         {
-            //SpelNewsChannels.Add(guild.Id, await guild.CreateTextChannelAsync("spel_utv_nyheter"));
-            //SystemNewsChannels.Add(guild.Id, await guild.CreateTextChannelAsync("system_utv_nyheter"));
-
             SocketTextChannel newsChannel = null;
 
             // Check if channels already exist. 
             foreach (var channel in guild.TextChannels)
             {
-                if (channel.Name == "classroom_nyheter")
+                if (channel.Name == _config["news_channel_name"])
                 {
                     newsChannel = channel;
                     if (!NewsChannels.ContainsKey(guild.Id))
@@ -59,7 +60,7 @@ namespace DiscordBot_Jane.Services
             // Create channels that don't exist.
             if (newsChannel == null)
                 if (!NewsChannelsRest.ContainsKey(guild.Id))
-                    NewsChannelsRest.Add(guild.Id, await guild.CreateTextChannelAsync("classroom_nyheter"));
+                    NewsChannelsRest.Add(guild.Id, await guild.CreateTextChannelAsync(_config["news_channel_name"]));
         }
     }
 }

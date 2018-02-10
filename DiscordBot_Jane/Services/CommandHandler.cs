@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.Configuration;
 
 namespace DiscordBot_Jane.Services
 {
@@ -15,17 +16,20 @@ namespace DiscordBot_Jane.Services
         private readonly CommandService _commands;
         private readonly LoggingService _logger;
         private readonly IServiceProvider _provider;
+        private readonly IConfigurationRoot _config;
 
         public CommandHandler(
             DiscordSocketClient discord,
             CommandService commands,
             LoggingService logger,
-            IServiceProvider provider)
+            IServiceProvider provider,
+            IConfigurationRoot config)
         {
             _discord = discord;
             _commands = commands;
             _logger = logger;
             _provider = provider;
+            _config = config;
 
             _discord.MessageReceived += OnMessageRecievedAsync;
         }
@@ -42,7 +46,7 @@ namespace DiscordBot_Jane.Services
 
             int argPos = 0;
             // Check if the message has a valid command Prefix.
-            if (msg.HasStringPrefix(Config.Trigger, ref argPos, StringComparison.InvariantCultureIgnoreCase) || msg.HasMentionPrefix(_discord.CurrentUser, ref argPos))
+            if (msg.HasStringPrefix(_config["trigger"], ref argPos, StringComparison.InvariantCultureIgnoreCase) || msg.HasMentionPrefix(_discord.CurrentUser, ref argPos))
             {
                 // Execute the command.
                 var result = await _commands.ExecuteAsync(context, argPos, _provider);
