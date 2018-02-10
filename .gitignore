@@ -301,3 +301,5 @@ __pycache__/
 
 # Discord bot configuration file
 _configuration.json
+# Google secret
+client_secret.json
