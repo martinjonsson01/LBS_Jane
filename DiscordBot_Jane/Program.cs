@@ -22,6 +22,12 @@ namespace DiscordBot_Jane
             #else
                 InDebugMode = false;
             #endif
+            // Set window position.
+            Console.WindowTop = 0;
+            Console.WindowLeft = 0;
+            // Change window size.
+            Console.SetWindowSize(200, Console.LargestWindowHeight - 10);
+            // Start program.
             new Program().StartAsync().GetAwaiter().GetResult();
         }
         

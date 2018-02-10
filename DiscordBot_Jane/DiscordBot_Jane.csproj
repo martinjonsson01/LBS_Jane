@@ -242,9 +242,13 @@
     <Compile Include="Services\StartupService.cs" />
     <Compile Include="Utils\ClassroomUtils.cs" />
     <Compile Include="Utils\EqualityUtils.cs" />
+    <Compile Include="Utils\StringExtensions.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="client_secret.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
     <None Include="_configuration.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

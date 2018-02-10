@@ -44,17 +44,61 @@ namespace DiscordBot_Jane.Services
                 File.Create(_logFile).Dispose();
 
             string logText =
-                $"{DateTime.Now:hh:mm:ss} [{severity}] {source}: {message}";
+                $"{DateTime.Now:HH:mm:ss} [{severity}] {source}: {message}";
             // Write the log text to a file.
             File.AppendAllText(_logFile, logText + "\n");
-
+            
             // Write the log text to the console.
-            return Console.Out.WriteLineAsync(logText);
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.Out.WriteAsync($"{DateTime.Now:HH:mm:ss} ");
+            Console.ForegroundColor = GetLogSeverityColor(severity);
+            var displaySeverity = $"[{severity}] ";
+            //Console.Out.WriteAsync($"{displaySeverity, -10}");
+            Console.Out.WriteAsync($"{displaySeverity}");
+            Console.ForegroundColor = GetSourceColor(source);
+            var displaySource = $"{source}: ";
+            //Console.Out.WriteAsync($"{displaySource, -10}");
+            Console.Out.WriteAsync($"{displaySource}");
+            Console.ForegroundColor = ConsoleColor.White;
+            return Console.Out.WriteLineAsync($"{message}");
+            //return Console.Out.WriteLineAsync(logText);
         }
 
         private Task OnLogAsync(LogMessage msg)
         {
             return LogAsync(msg.Severity, msg.Source, msg.Exception?.ToString() ?? msg.Message);
+        }
+
+        private ConsoleColor GetLogSeverityColor(LogSeverity severity)
+        {
+            switch (severity)
+            {
+                case LogSeverity.Info:
+                    return ConsoleColor.Blue;
+                case LogSeverity.Verbose:
+                    return ConsoleColor.DarkBlue;
+                case LogSeverity.Debug:
+                    return ConsoleColor.DarkGreen;
+                case LogSeverity.Warning:
+                    return ConsoleColor.Yellow;
+                case LogSeverity.Error:
+                    return ConsoleColor.DarkYellow;
+                case LogSeverity.Critical:
+                    return ConsoleColor.DarkRed;
+                default:
+                    return ConsoleColor.White;
+            }
+        }
+
+        private ConsoleColor GetSourceColor(string source)
+        {
+            switch (source)
+            {
+                case nameof(JaneClassroomService):
+                    return ConsoleColor.Magenta;
+                default:
+                    return ConsoleColor.Gray;
+            }
         }
     }
 }

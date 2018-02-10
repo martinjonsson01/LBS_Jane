@@ -116,7 +116,7 @@ namespace DiscordBot_Jane.Services
                         foreach (var pair in CourseWorks.Except(oldCourseWorks,
                             new CourseWorkDictionaryEqualityComparer()))
                         {
-                            await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService), $"CourseWork change detected in course {pair.Key}");
+                            await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService), $"CourseWork change detected in course {pair.Key}");
                             foreach (var newCourseWork in pair.Value.Value.Except(oldCourseWorks[pair.Key].Value, new CourseWorkEqualityComparer()))
                             {
                                 // Handle in every guild.
@@ -132,7 +132,7 @@ namespace DiscordBot_Jane.Services
                         foreach (var pair in Announcements.Except(oldAnnouncements,
                             new CourseAnnouncementDictionaryEqualityComparer()))
                         {
-                            await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService), $"Announcement change detected in course {pair.Key}");
+                            await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService), $"Announcement change detected in course {pair.Key}");
                             foreach (var newAnnouncement in pair.Value.Value.Except(oldAnnouncements[pair.Key].Value, new CourseAnnouncementEqualityComparer()))
                             {
                                 // Handle in every guild.
@@ -151,7 +151,7 @@ namespace DiscordBot_Jane.Services
                     }
                     catch (TaskCanceledException e)
                     {
-                        await _logger.LogAsync(LogSeverity.Error, nameof(ClassroomService), e.Message);
+                        await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), e.Message);
                         break;
                     }
                 }
@@ -160,8 +160,13 @@ namespace DiscordBot_Jane.Services
 
         private async Task HandleNewCourseWork(Course course, CourseWork newCourseWork, SocketGuild guild)
         {
-            await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService),
-                $"Announcing new course work for {course.Name}: {newCourseWork.Title.Substring(0, Math.Min(25, newCourseWork.Title.Length))} in guild {guild.Name}");
+            var formattedCourseWork =
+                newCourseWork.Title
+                .Replace("\n", " ")
+                .Truncate(_config.GetValue("truncate_latest_messages", 25));
+            await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                $"Announcing new course work for \"{course.Name}\": \"{formattedCourseWork}\" in guild \"{guild.Name}\"");
+
             DateTimeOffset dateTimeOffset = GetDateTimeOffsetFromDateAndTimeOfDay(newCourseWork.DueDate, newCourseWork.DueTime);
 
             // Find the teacher who created this announcement.
@@ -220,7 +225,7 @@ namespace DiscordBot_Jane.Services
                 }
                 else
                 {
-                    await _logger.LogAsync(LogSeverity.Error, nameof(ClassroomService), $"News channel is null for guild {guild.Name}");
+                    await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"News channel is null for guild {guild.Name}");
                 }
             }
             else if (_channelService.NewsChannelsRest.TryGetValue(guild.Id, out var restChannel))
@@ -234,19 +239,23 @@ namespace DiscordBot_Jane.Services
                 }
                 else
                 {
-                    await _logger.LogAsync(LogSeverity.Error, nameof(ClassroomService), $"Rest news channel is null for guild {guild.Name}");
+                    await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"Rest news channel is null for guild {guild.Name}");
                 }
             }
             else
             {
-                await _logger.LogAsync(LogSeverity.Error, nameof(ClassroomService), $"No news channel assigned for guild {guild.Name}");
+                await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"No news channel assigned for guild {guild.Name}");
             }
         }
 
         private async Task HandleNewCourseAnnouncement(Course course, Announcement newAnnouncement, SocketGuild guild)
         {
-            await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService),
-                $"New announcement for {course.Name}: {newAnnouncement.Text.Substring(0, Math.Min(25, newAnnouncement.Text.Length))}");
+            var formattedAnnouncement =
+                newAnnouncement.Text
+                .Replace("\n", " ")
+                .Truncate(_config.GetValue("truncate_latest_messages", 25));
+            await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                $"New announcement for \"{course.Name}\": \"{formattedAnnouncement}\" in guild \"{guild.Name}\"");
 
             DateTimeOffset creationTime = DateTimeOffset.MinValue;
             if (newAnnouncement.CreationTime is DateTime creationDateTime)
@@ -347,12 +356,12 @@ namespace DiscordBot_Jane.Services
             // List courses.
             ListCoursesResponse response = await coursesRequest.ExecuteAsync(_token);
 
-            await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService), "Courses:");
+            await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService), "Courses:");
             if (response.Courses != null && response.Courses.Count > 0)
             {
                 foreach (var course in response.Courses)
                 {
-                    await _logger.LogAsync(LogSeverity.Debug, nameof(ClassroomService),
+                    await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService),
                         $"{course.Name} ({course.Id})");
 
                     // Add course to dictionaries.
@@ -386,8 +395,12 @@ namespace DiscordBot_Jane.Services
                                 if (courseWorkResponse.CourseWork?[0] != null)
                                     firstCourseWorkTitle = courseWorkResponse.CourseWork[0].Title;
 
-                                await _logger.LogAsync(LogSeverity.Info, nameof(ClassroomService),
-                                    $"[{course.Name}] Latest work: {firstCourseWorkTitle}");
+                                var latestCourseWork =
+                                    firstCourseWorkTitle
+                                    .Replace("\n", " ")
+                                    .Truncate(_config.GetValue("truncate_latest_messages", 25));
+                                await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService),
+                                    $"[{course.Name}] Latest work: \"{latestCourseWork}\"");
                             }
                         });
 
@@ -415,8 +428,12 @@ namespace DiscordBot_Jane.Services
                                     firstCourseWorkTitle =
                                         courseAnnouncementsResponse.Announcements[0].Text;
 
-                                await _logger.LogAsync(LogSeverity.Info, nameof(ClassroomService),
-                                    $"[{course.Name}] Latest announcement: {firstCourseWorkTitle}");
+                                var latestAnnouncement =
+                                    firstCourseWorkTitle
+                                    .Replace("\n", " ")
+                                    .Truncate(_config.GetValue("truncate_latest_messages", 25));
+                                await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService),
+                                    $"[{course.Name}] Latest announcement: \"{latestAnnouncement}\"");
                             }
                         });
                 }
@@ -425,7 +442,7 @@ namespace DiscordBot_Jane.Services
             }
             else
             {
-                await _logger.LogAsync(LogSeverity.Error, nameof(ClassroomService), "No courses found.");
+                await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), "No courses found.");
             }
         }
 
@@ -447,7 +464,7 @@ namespace DiscordBot_Jane.Services
                     "user",
                     CancellationToken.None,
                     new FileDataStore(credPath, true)).Result;
-                await _logger.LogAsync(LogSeverity.Info, nameof(ClassroomService),
+                await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
                     "Credential file saved to: " + credPath);
             }
 
