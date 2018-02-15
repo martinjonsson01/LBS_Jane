@@ -11,7 +11,7 @@ using Discord.WebSocket;
 using Google.Apis.Classroom.v1;
 using Microsoft.Extensions.Configuration;
 
-namespace DiscordBot_Jane.Services
+namespace DiscordBot_Jane.Core.Services
 {
     public class ChannelService
     {

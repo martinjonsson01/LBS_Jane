@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -9,18 +10,19 @@ using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
-using DiscordBot_Jane.Utils;
+using DiscordBot_Jane.Core.Equality_Comparers;
+using DiscordBot_Jane.Core.Utils;
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Classroom.v1;
 using Google.Apis.Classroom.v1.Data;
 using Google.Apis.Requests;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
-using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Configuration;
 using Color = Discord.Color;
+using Timer = System.Timers.Timer;
 
-namespace DiscordBot_Jane.Services
+namespace DiscordBot_Jane.Core.Services
 {
     public class JaneClassroomService
     {
@@ -35,6 +37,7 @@ namespace DiscordBot_Jane.Services
         private readonly IServiceProvider _provider;
         private readonly ChannelService _channelService;
         private readonly IConfigurationRoot _config;
+        private readonly Random _random;
 
         private static readonly string[] Scopes =
         {
@@ -56,7 +59,8 @@ namespace DiscordBot_Jane.Services
             LoggingService logger,
             IServiceProvider provider,
             ChannelService channelService,
-            IConfigurationRoot config)
+            IConfigurationRoot config,
+            Random random)
         {
             _discord = discord;
             _commands = commands;
@@ -64,6 +68,8 @@ namespace DiscordBot_Jane.Services
             _provider = provider;
             _channelService = channelService;
             _config = config;
+            _random = random;
+
             _discord.Ready += StartPollDataFromClassroomTask;
         }
 
@@ -101,18 +107,45 @@ namespace DiscordBot_Jane.Services
                     var oldAnnouncements = Announcements.ToDictionary(entry => entry.Key,
                                                                       entry => entry.Value);
 
-                    // TODO: Remove this, this is for testing.
-                    oldAnnouncements[oldAnnouncements.Keys.ElementAt(3)].Value.RemoveAt(2);
-
                     // No need to get data from classroom if this is the first  
                     // loop since it was already called before entering the loop.
                     if (firstLoop)
                         firstLoop = false;
                     else
-                        await GetDataFromClassroomTask(service);
-                    
-                    if (oldCourseWorks.Keys.Count > 0)
                     {
+                        // Time how long fetching data takes.
+                        var stopWatch = new Stopwatch();
+                        await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                            "Fetching data from Classroom...");
+                        stopWatch.Start();
+                        // Fetch new data from classroom.
+                        await GetDataFromClassroomTask(service);
+                        // Stop timer and log how long fetching data from Classroom took.
+                        stopWatch.Stop();
+                        await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                            $"Fetching data from Classroom completed! Took {stopWatch.ElapsedMilliseconds} ms");
+                        
+                        /*if (Program.InDebugMode)
+                        {
+                            // TODO: Remove this, this is for testing.
+                            var temp = oldCourseWorks[oldCourseWorks.Keys.ElementAt(4)].Value[0];
+                            CourseWorks[CourseWorks.Keys.ElementAt(4)].Value.Add(new CourseWork
+                            {
+                                AlternateLink = temp.AlternateLink,
+                                Title = "THIS IS A TEST#" + _random.Next(1111, 9999),
+                                Id = "123"
+                            });
+
+                            // TODO: Remove this, this is for testing.
+                            CourseWorks[CourseWorks.Keys.ElementAt(1)].Value[0].DueDate = new Date {Day = 13, Month = 2, Year = 2018};
+                            CourseWorks[CourseWorks.Keys.ElementAt(1)].Value[0].DueTime = new TimeOfDay {Hours = 12, Minutes = 30};
+                        }*/
+
+                        // Time how long checking for changes takes.
+                        stopWatch.Reset();
+                        await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                            "Checking for changes in data...");
+                        stopWatch.Start();
                         foreach (var pair in CourseWorks.Except(oldCourseWorks,
                             new CourseWorkDictionaryEqualityComparer()))
                         {
@@ -126,9 +159,6 @@ namespace DiscordBot_Jane.Services
                                 }
                             }
                         }
-                    }
-                    if (oldAnnouncements.Keys.Count > 0)
-                    {
                         foreach (var pair in Announcements.Except(oldAnnouncements,
                             new CourseAnnouncementDictionaryEqualityComparer()))
                         {
@@ -142,12 +172,16 @@ namespace DiscordBot_Jane.Services
                                 }
                             }
                         }
+                        // Stop timer and print how long checking for changes in data took.
+                        stopWatch.Stop();
+                        await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
+                            $"Checking for changes in data completed! Took {stopWatch.ElapsedMilliseconds} ms");
                     }
 
                     try
                     {
-                        double result = double.TryParse(_config["classroom_interval_minutes"], out result) ? result : 1;
-                        await Task.Delay(TimeSpan.FromMinutes(result), _token);
+                        double interval = _config.GetValue("classroom_interval_minutes", 1.0);
+                        await Task.Delay(TimeSpan.FromMinutes(interval), _token);
                     }
                     catch (TaskCanceledException e)
                     {
@@ -167,7 +201,7 @@ namespace DiscordBot_Jane.Services
             await _logger.LogAsync(LogSeverity.Info, nameof(JaneClassroomService),
                 $"Announcing new course work for \"{course.Name}\": \"{formattedCourseWork}\" in guild \"{guild.Name}\"");
 
-            DateTimeOffset dateTimeOffset = GetDateTimeOffsetFromDateAndTimeOfDay(newCourseWork.DueDate, newCourseWork.DueTime);
+            DateTimeOffset dateTimeOffset = ClassroomUtils.GetDateTimeOffsetFromDateAndTimeOfDay(newCourseWork.DueDate, newCourseWork.DueTime);
 
             // Find the teacher who created this announcement.
             var teacherPhotoUrl = newCourseWork.GetTeacher(course, CourseTeachers)?.Profile?.PhotoUrl ?? "https://cdn.discordapp.com/embed/avatars/0.png";
@@ -190,62 +224,26 @@ namespace DiscordBot_Jane.Services
                 {
                     var teacherImage = _config[$"classroom_courses:{course.Name}:TeacherImage"] ?? $"https:{teacherPhotoUrl}";
                     author
-                        .WithName($"{course.Name} - {course.Section}")
+                        .WithName($"{course.Name} – {course.Section}")
                         .WithUrl(course.AlternateLink)
                         .WithIconUrl(teacherImage);
                 });
 
             // Add materials as fields.
             if (newCourseWork.Materials != null)
-                AddMaterialsAsField(newCourseWork.Materials, builder);
+                ClassroomUtils.AddMaterialsAsField(newCourseWork.Materials, builder);
 
             // Build embed.
             var embed = builder.Build();
 
             // Get mentions of all roles that should be mentioned.
-            string announceMessage = GetAnnounceMessageWithRolesMention(course, guild);
+            string announceMessage = ClassroomUtils.GetAnnounceMessageWithRolesMention(course, guild, _config, "NewCourseWork");
 
             // Announce new course work.
-            await AnnounceNews(guild, embed, announceMessage);
+            await ClassroomUtils.AnnounceNews(guild, embed, announceMessage, _channelService, _logger);
 
             // Link all course work materials.
             //await LinkMaterialsNew(newCourseWork.Materials, guild.GetTextChannel(397542059596316673));
-        }
-
-        private async Task AnnounceNews(SocketGuild guild, Embed embed, string announceMessage)
-        {
-            if (_channelService.NewsChannels.TryGetValue(guild.Id, out var channel))
-            {
-                if (channel != null)
-                {
-                    // Announce new course work along with embed.
-                    await channel.SendMessageAsync(
-                        announceMessage,
-                        embed: embed);
-                }
-                else
-                {
-                    await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"News channel is null for guild {guild.Name}");
-                }
-            }
-            else if (_channelService.NewsChannelsRest.TryGetValue(guild.Id, out var restChannel))
-            {
-                if (restChannel != null)
-                {
-                    // Announce new course work along with embed.
-                    await restChannel.SendMessageAsync(
-                        announceMessage,
-                        embed: embed);
-                }
-                else
-                {
-                    await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"Rest news channel is null for guild {guild.Name}");
-                }
-            }
-            else
-            {
-                await _logger.LogAsync(LogSeverity.Error, nameof(JaneClassroomService), $"No news channel assigned for guild {guild.Name}");
-            }
         }
 
         private async Task HandleNewCourseAnnouncement(Course course, Announcement newAnnouncement, SocketGuild guild)
@@ -293,55 +291,19 @@ namespace DiscordBot_Jane.Services
 
             // Add materials as fields.
             if (newAnnouncement.Materials != null)
-                AddMaterialsAsField(newAnnouncement.Materials, builder);
+                ClassroomUtils.AddMaterialsAsField(newAnnouncement.Materials, builder);
 
             // Build embed.
             var embed = builder.Build();
 
             // Get mentions of all roles that should be mentioned.
-            string announceMessage = GetAnnounceMessageWithRolesMention(course, guild);
+            string announceMessage = ClassroomUtils.GetAnnounceMessageWithRolesMention(course, guild, _config);
 
             // Announce new course announcement.
-            await AnnounceNews(guild, embed, announceMessage);
+            await ClassroomUtils.AnnounceNews(guild, embed, announceMessage, _channelService, _logger);
 
             // Link all announcement materials.
             //await LinkMaterialsNew(newAnnouncement.Materials, guild.GetTextChannel(397542059596316673));
-        }
-
-        private string GetAnnounceMessageWithRolesMention(Course course, SocketGuild guild)
-        {
-            var announceMessage = $"{_config["messages:NewAnnouncement"]} från {course.Name}";
-            foreach (var role in Config.CourseMentionRoles(course.Name, guild, _config))
-            {
-                if (role.Id == guild.Id)
-                    announceMessage += " @everyone";
-                else
-                    announceMessage += $" {role.Mention}";
-            }
-            return announceMessage;
-        }
-
-        private async Task LinkMaterialsNew(IList<Material> materials, SocketTextChannel channel)
-        {
-            if (materials != null)
-            {
-                await channel.SendMessageAsync("**Material:**");
-                foreach (var material in materials)
-                {
-                    var materialInfo = GetMaterialInfo(material);
-
-                    var materialBuilder = new EmbedBuilder()
-                        .WithTitle(materialInfo.materialTitle)
-                        .WithUrl(materialInfo.materialLink)
-                        .WithColor(new Color(0x386CC2))
-                        .WithImageUrl(materialInfo.materialThumbnail);
-                    var materialEmbed = materialBuilder.Build();
-
-                    await channel.SendMessageAsync(
-                        "",
-                        embed: materialEmbed);
-                }
-            }
         }
 
         private async Task GetDataFromClassroomTask(ClassroomService service)
@@ -355,15 +317,11 @@ namespace DiscordBot_Jane.Services
 
             // List courses.
             ListCoursesResponse response = await coursesRequest.ExecuteAsync(_token);
-
-            await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService), "Courses:");
+            
             if (response.Courses != null && response.Courses.Count > 0)
             {
                 foreach (var course in response.Courses)
                 {
-                    await _logger.LogAsync(LogSeverity.Debug, nameof(JaneClassroomService),
-                        $"{course.Name} ({course.Id})");
-
                     // Add course to dictionaries.
                     if (!CourseWorks.ContainsKey(course.Name))
                         CourseWorks.Add(course.Name, new KeyValuePair<Course, List<CourseWork>>(course, new List<CourseWork>()));
@@ -476,61 +434,5 @@ namespace DiscordBot_Jane.Services
             });
             return service;
         }
-
-        private static DateTimeOffset GetDateTimeOffsetFromDateAndTimeOfDay(Date date, TimeOfDay time)
-        {
-            // Generate a DateTimeOffset based on the due date of the course work.
-            var year = date?.Year ?? DateTime.Now.Year;
-            var month = date?.Month ?? DateTime.Now.Month;
-            var day = date?.Day ?? DateTime.Now.Day;
-            var hours = time?.Hours ?? DateTime.Now.Hour;
-            var minutes = time?.Minutes ?? DateTime.Now.Minute;
-            var seconds = time?.Seconds ?? DateTime.Now.Second;
-            return new DateTimeOffset(new DateTime(year, month, day, hours, minutes, seconds));
-        }
-
-        private static void AddMaterialsAsField(IEnumerable<Material> materials, EmbedBuilder builder)
-        {
-            foreach (var material in materials)
-            {
-                var materialInfo = GetMaterialInfo(material);
-                builder.AddField("Material:",
-                    $"[{materialInfo.materialTitle}]({materialInfo.materialLink})");
-            }
-        }
-
-        private static (string materialTitle, string materialLink, string materialThumbnail) GetMaterialInfo(Material material)
-        {
-            // Get different material title depending on material type.
-            var materialTitle = "null";
-            var materialLink = "null";
-            var materialThumbnail = "null";
-            if (material.DriveFile?.DriveFile != null)
-            {
-                materialTitle = material.DriveFile?.DriveFile.Title;
-                materialLink = material.DriveFile?.DriveFile.AlternateLink;
-                materialThumbnail = material.DriveFile?.DriveFile?.ThumbnailUrl;
-            }
-            else if (material.Form != null)
-            {
-                materialTitle = material.Form.Title;
-                materialLink = material.Form?.FormUrl;
-                materialThumbnail = material.Form?.ThumbnailUrl;
-            }
-            else if (material.YoutubeVideo != null)
-            {
-                materialTitle = material.YoutubeVideo.Title;
-                materialLink = material.YoutubeVideo?.AlternateLink;
-                materialThumbnail = material.YoutubeVideo?.ThumbnailUrl;
-            }
-            else if (material.Link != null)
-            {
-                materialTitle = material.Link.Title;
-                materialLink = material.Link?.Url;
-                materialThumbnail = material.Link?.ThumbnailUrl;
-            }
-            return (materialTitle, materialLink, materialThumbnail);
-        }
-
     }
 }

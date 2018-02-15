@@ -1,11 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Google.Apis.Classroom.v1.Data;
 
-namespace DiscordBot_Jane
+namespace DiscordBot_Jane.Core.Equality_Comparers
 {
     public class CourseAnnouncementEqualityComparer : IEqualityComparer<Announcement>
     {

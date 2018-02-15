@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 
-namespace DiscordBot_Jane
+namespace DiscordBot_Jane.Core.Utils
 {
-    public static class Config
+    public static class ConfigUtils
     {
         public static List<SocketRole> CourseMentionRoles(string courseName, SocketGuild guild, IConfigurationRoot config)
         {

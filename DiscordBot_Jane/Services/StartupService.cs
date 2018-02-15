@@ -11,7 +11,7 @@ using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DiscordBot_Jane.Services
+namespace DiscordBot_Jane.Core.Services
 {
     public class StartupService
     {

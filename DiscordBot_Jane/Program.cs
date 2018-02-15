@@ -2,14 +2,19 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using System;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing;
 using System.IO;
-using System.Linq;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
-using DiscordBot_Jane.Services;
+using System.Windows.Forms;
+using DiscordBot_Jane.Core.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace DiscordBot_Jane
+namespace DiscordBot_Jane.Core
 {
     public class Program
     {
@@ -22,16 +27,24 @@ namespace DiscordBot_Jane
             #else
                 InDebugMode = false;
             #endif
-            // Set window position.
-            Console.WindowTop = 0;
-            Console.WindowLeft = 0;
             // Change window size.
-            Console.SetWindowSize(200, Console.LargestWindowHeight - 10);
-            // Start program.
-            new Program().StartAsync().GetAwaiter().GetResult();
+            Console.SetWindowSize(1, 1);
+            // Make sure application isn't already running.
+            var mutex_id = "BOT_DISCORD_JANE";
+            using (var mutex = new Mutex(false, mutex_id))
+            {
+                if (!mutex.WaitOne(0, false))
+                {
+                    MessageBox.Show("Instans Redan Igång!", "Error", MessageBoxButtons.OK, MessageBoxIcon.Hand);
+                    return;
+                }
+                // Start program.
+                new Program().StartAsync().GetAwaiter().GetResult();
+            }
         }
         
         private IConfigurationRoot _config;
+        private bool _visible = true;
 
         private async Task StartAsync()
         {
@@ -57,21 +70,94 @@ namespace DiscordBot_Jane
                 .AddSingleton<StartupService>()       // Starts up the bot.
                 .AddSingleton<ChannelService>()       // Handles creating required channels.
                 .AddSingleton<JaneClassroomService>() // Handles all interactions with Google Classroom.
+                .AddSingleton<ReminderService>()      // Schedules and executes all reminders.
+                .AddSingleton<NotifyIcon>()           // Tray icon for controlling application while in background.
                 .AddSingleton<Random>()               // You get better random with a single instance than by creating a new one every time you need it.
-                .AddSingleton(_config);         // Add the configuration to the collection
+                .AddSingleton(_config);               // Add the configuration to the collection.
 
             // Create the service provider.
             var provider = services.BuildServiceProvider();
 
-            // Initialize the logging service, startup service, and command handler (along with other services).
-            provider.GetRequiredService<LoggingService>();
+            // Initialize services.
+            var logger = provider.GetRequiredService<LoggingService>();
+            var notifyIcon = provider.GetRequiredService<NotifyIcon>();
             await provider.GetRequiredService<StartupService>().StartAsync();
             provider.GetRequiredService<ChannelService>();
             provider.GetRequiredService<JaneClassroomService>();
+            provider.GetRequiredService<ReminderService>();
             provider.GetRequiredService<CommandHandler>();
 
-            // Prevent the application from closing.
-            await Task.Delay(-1);
+            // Set up NotifyIcon.
+            SetUpNotifyIcon(notifyIcon, logger);
+
+            // Hide console window.
+            Hide();
+            // Run the application. (This handles events for the NotifyIcon and similar windows things.)
+            Application.Run(); // If anything blow this line gets executed then the application is shutting off.
+
+            // Hide NotifyIcon.
+            notifyIcon.Visible = false;
+        }
+
+        private void SetUpNotifyIcon(NotifyIcon notifyIcon, LoggingService logger)
+        {
+            notifyIcon.Icon = new Icon("icon.ico", 60, 60);
+            notifyIcon.Visible = true;
+            MenuItem[] menuList =
+            {
+                new MenuItem("Show/Hide Console", (s, e) => ToggleShow()) {DefaultItem = true},
+                new MenuItem("-"),
+                new MenuItem("Open log folder", (s, e) => Process.Start(logger.LogDirectory)),
+                new MenuItem("Open config", (s, e) => Process.Start(AppContext.BaseDirectory + "_configuration.json")),
+                new MenuItem("-"),
+                new MenuItem("Exit", (s, e) => Application.Exit())
+            };
+            var clickMenu = new ContextMenu(menuList);
+            notifyIcon.ContextMenu = clickMenu;
+            notifyIcon.Click += (s, e) =>
+            {
+                if (!(e is MouseEventArgs me)) return;
+                if (me.Button == MouseButtons.Left) ToggleShow();
+            };
+            notifyIcon.DoubleClick += (s, e) =>
+            {
+                ToggleShow();
+                Process.Start(logger.LogFile);
+            };
+        }
+
+        [DllImport("kernel32.dll")]
+        private static extern IntPtr GetConsoleWindow();
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        private const int SwHide = 0;
+        private const int SwShow = 5;
+
+        private void Show()
+        {
+            var handle = GetConsoleWindow();
+            // Show.
+            ShowWindow(handle, SwShow);
+            // Check window size and modify if necessary.
+            if (Console.WindowWidth != 200 || Console.WindowHeight != Console.LargestWindowHeight - 20)
+                Console.SetWindowSize(200, Console.LargestWindowHeight - 20);
+            _visible = true;
+        }
+
+        private void Hide()
+        {
+            var handle = GetConsoleWindow();
+            // Hide.
+            ShowWindow(handle, SwHide);
+            _visible = false;
+        }
+
+        private void ToggleShow()
+        {
+            if (_visible) Hide();
+            else if (!_visible) Show();
         }
     }
 }

@@ -8,7 +8,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 
-namespace DiscordBot_Jane.Services
+namespace DiscordBot_Jane.Core.Services
 {
     public class CommandHandler
     {

@@ -8,7 +8,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using Microsoft.Extensions.Configuration;
 
-namespace DiscordBot_Jane.Modules
+namespace DiscordBot_Jane.Core.Modules
 {
     [Name("Moderation")]
     [RequireContext(ContextType.Guild)]

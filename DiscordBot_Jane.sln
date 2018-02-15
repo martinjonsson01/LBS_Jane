@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27004.2009
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordBot_Jane", "DiscordBot_Jane\DiscordBot_Jane.csproj", "{98D785D1-CB4A-4811-9309-7C9C385A0C46}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordBot_Jane.Core", "DiscordBot_Jane\DiscordBot_Jane.Core.csproj", "{98D785D1-CB4A-4811-9309-7C9C385A0C46}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

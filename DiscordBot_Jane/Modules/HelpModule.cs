@@ -9,7 +9,7 @@ using Discord;
 using Discord.Commands;
 using Microsoft.Extensions.Configuration;
 
-namespace DiscordBot_Jane.Modules
+namespace DiscordBot_Jane.Core.Modules
 {
     [Name("Hjälp")]
     public class HelpModule : ModuleBase<SocketCommandContext>

@@ -5,7 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Google.Apis.Classroom.v1.Data;
 
-namespace DiscordBot_Jane.Utils
+namespace DiscordBot_Jane.Core.Utils
 {
     public static class EqualityUtils
     {

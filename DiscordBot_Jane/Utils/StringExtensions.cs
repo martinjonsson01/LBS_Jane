@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace DiscordBot_Jane.Utils
+namespace DiscordBot_Jane.Core.Utils
 {
     public static class StringExtensions
     {
