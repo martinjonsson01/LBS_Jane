@@ -26,6 +26,13 @@ namespace DiscordBot_Jane.Core.Modules
         [RequireUserPermission(GuildPermission.KickMembers)]
         public async Task Kick([Remainder]SocketGuildUser user)
         {
+            // If user being kicked can also kick users.
+            if (user.GuildPermissions.KickMembers)
+            {
+                await Context.Channel.SendFileAsync($"gifs/{_config["gifs:error_permission"] ?? "boi"}.gif");
+                await ReplyAsync($"boi {Context.User.Mention} du kan inte kicka {user.Username} smh...");
+                return;
+            }
             await ReplyAsync($"hejdå {user.Mention} :wave:");
             await user.KickAsync();
         }
@@ -35,6 +42,13 @@ namespace DiscordBot_Jane.Core.Modules
         [RequireUserPermission(GuildPermission.KickMembers)]
         public async Task Kick(SocketGuildUser user, string reason)
         {
+            // If user being kicked can also kick users.
+            if (user.GuildPermissions.KickMembers)
+            {
+                await Context.Channel.SendFileAsync($"gifs/{_config["gifs:error_permission"] ?? "boi"}.gif");
+                await ReplyAsync($"boi {Context.User.Mention} du kan inte kicka {user.Username} smh...");
+                return;
+            }
             await ReplyAsync($"hejdå {user.Mention} :wave:");
             await user.KickAsync(reason);
         }
@@ -44,6 +58,13 @@ namespace DiscordBot_Jane.Core.Modules
         [RequireUserPermission(GuildPermission.BanMembers)]
         public async Task Ban([Remainder]SocketGuildUser user)
         {
+            // If user being banned can also ban users.
+            if (user.GuildPermissions.BanMembers)
+            {
+                await Context.Channel.SendFileAsync($"gifs/{_config["gifs:error_permission"] ?? "boi"}.gif");
+                await ReplyAsync($"boiii {Context.User.Mention} det kan du inte göra...");
+                return;
+            }
             await ReplyAsync($"hejdå {user.Mention} :wave:");
             await Context.Guild.AddBanAsync(user, _config.GetValue("ban_prune_days", 7));
         }
@@ -53,6 +74,13 @@ namespace DiscordBot_Jane.Core.Modules
         [RequireUserPermission(GuildPermission.BanMembers)]
         public async Task Ban(SocketGuildUser user, string reason)
         {
+            // If user being banned can also ban users.
+            if (user.GuildPermissions.BanMembers)
+            {
+                await Context.Channel.SendFileAsync($"gifs/{_config["gifs:error_permission"] ?? "boi"}.gif");
+                await ReplyAsync($"boiii {Context.User.Mention} det kan du inte göra...");
+                return;
+            }
             await ReplyAsync($"hejdå {user.Mention} :wave:");
             await Context.Guild.AddBanAsync(user, _config.GetValue("ban_prune_days", 7), reason);
         }

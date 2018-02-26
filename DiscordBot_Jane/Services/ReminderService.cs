@@ -9,6 +9,7 @@ using Discord.Commands;
 using Discord.WebSocket;
 using DiscordBot_Jane.Core.Models;
 using DiscordBot_Jane.Core.Utils;
+using Google.Apis.Auth.OAuth2;
 using Google.Apis.Classroom.v1.Data;
 using Microsoft.Extensions.Configuration;
 
@@ -17,15 +18,17 @@ namespace DiscordBot_Jane.Core.Services
     public class ReminderService
     {
         private readonly DiscordSocketClient _discord;
+        private readonly GoogleAuthenticateService _gAuth;
         private readonly LoggingService _logger;
         private readonly ChannelService _channelService;
         private readonly IConfigurationRoot _config;
         private readonly JaneClassroomService _classroom;
 
-        private CancellationToken _token = default(CancellationToken);
+        public readonly CancellationTokenSource CancellationToken = new CancellationTokenSource();
 
         public ReminderService(
             DiscordSocketClient discord,
+            GoogleAuthenticateService gAuth,
             LoggingService logger,
             ChannelService channelService,
             IConfigurationRoot config,
@@ -33,17 +36,18 @@ namespace DiscordBot_Jane.Core.Services
             )
         {
             _discord = discord;
+            _gAuth = gAuth;
             _logger = logger;
             _channelService = channelService;
             _config = config;
             _classroom = classroom;
 
-            _discord.Connected += StartCheckRemindersTask;
+            _gAuth.GoogleAuthenticated += StartCheckRemindersTask;
         }
-
-        private async Task StartCheckRemindersTask()
+        
+        private async void StartCheckRemindersTask(object sender, UserCredential credential)
         {
-            _discord.Connected -= StartCheckRemindersTask;
+            _gAuth.GoogleAuthenticated -= StartCheckRemindersTask;
             
             /* 
                 * This loop does not end until application exits.
@@ -52,18 +56,18 @@ namespace DiscordBot_Jane.Core.Services
                 * 2. Sleep for a period of time.
                 * 3. Repeat.
                 */
-            while (!_token.IsCancellationRequested)
+            while (!CancellationToken.IsCancellationRequested)
             {
                 // Check if any reminders are due.
                 await CheckReminders();
                 try
                 {
                     double interval = _config.GetValue("reminder_interval_minutes", 0.5);
-                    await Task.Delay(TimeSpan.FromMinutes(interval), _token);
+                    await Task.Delay(TimeSpan.FromMinutes(interval), CancellationToken.Token);
                 }
                 catch (TaskCanceledException e)
                 {
-                    await _logger.LogAsync(LogSeverity.Error, nameof(ReminderService), e.Message);
+                    await _logger.LogAsync(LogSeverity.Info, nameof(ReminderService), e.Message);
                     break;
                 }
             }
@@ -85,14 +89,20 @@ namespace DiscordBot_Jane.Core.Services
                                     .Replace("\n", " ")
                                     .Truncate(_config.GetValue("truncate_latest_messages", 25));
                             var dueHours = _config.GetValue("remind_within_hours", 24);
-                            await _logger.LogAsync(LogSeverity.Info, nameof(ReminderService), $"Course work {formattedCourseWork} is due within {dueHours} hours. Announcing it.");
+
+                            await _logger.LogAsync(LogSeverity.Info, nameof(ReminderService),
+                                $"Course work {formattedCourseWork} is due within {dueHours} hours. Announcing it.");
 
                             foreach (var guild in _discord.Guilds)
                             {
-                                var workDueAnnouncement = CreateWorkDueAnnouncement(guild, courseWork);
-                                // Announce reminder.
-                                await ClassroomUtils.AnnounceNews(guild, workDueAnnouncement.embed,
-                                    workDueAnnouncement.message, _channelService, _logger);
+                                // If guild isn't added to the classroom blacklist.
+                                if (!ConfigUtils.ContainsValueAt("classroom_guilds_blacklist", guild.Name, _config))
+                                {
+                                    var workDueAnnouncement = CreateWorkDueAnnouncement(guild, courseWork);
+                                    // Announce reminder.
+                                    await ClassroomUtils.AnnounceNews(guild, workDueAnnouncement.embed,
+                                        workDueAnnouncement.message, _channelService, _logger);
+                                }
                             }
                         }
                     }

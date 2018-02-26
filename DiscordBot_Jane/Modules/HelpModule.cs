@@ -33,7 +33,7 @@ namespace DiscordBot_Jane.Core.Modules
             var builder = new EmbedBuilder()
             {
                 Color = new Color(114, 137, 218),
-                Description = "Detta är vad jag kan göra:"
+                Description = "Detta är vad jag kan göra:\n\n[] = parametrar \n{} = alternativa kommandon\n\n"
             };
 
             foreach (var module in _service.Modules)
@@ -43,7 +43,35 @@ namespace DiscordBot_Jane.Core.Modules
                 {
                     var result = await cmd.CheckPreconditionsAsync(Context);
                     if (result.IsSuccess)
-                        description += $"{_config["trigger"]} {cmd.Aliases.First()}\n";
+                    {
+                        description += $"`{_config["trigger"]}{cmd.Aliases.First()}";
+                        foreach (var alias in cmd.Aliases)
+                        {
+                            if (cmd.Aliases[0] == alias)
+                                continue;
+                            if (cmd.Aliases[1] == alias)
+                                description += "{";
+                            description += alias;
+                            if (cmd.Aliases[cmd.Aliases.Count - 1] == alias)
+                                description += "} ";
+                            else
+                                description += ", ";
+                        }
+                        if (cmd.Parameters.Count == 0)
+                            description += "`\n";
+                        foreach (var par in cmd.Parameters)
+                        {
+                            if (cmd.Parameters[0] == par)
+                                description += "[";
+                            description += $"{par.Name}";
+                            if (cmd.Parameters[cmd.Parameters.Count - 1] == par)
+                                description += "]`\n";
+                            else
+                                description += ", ";
+                        }
+                        if (!string.IsNullOrEmpty(cmd.Summary))
+                            description += $"       {cmd.Summary}\n\n";
+                    }
                 }
 
                 if (!string.IsNullOrWhiteSpace(description))

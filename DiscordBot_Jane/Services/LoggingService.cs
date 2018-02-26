@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+using Microsoft.Extensions.Configuration;
 using static DiscordBot_Jane.Core.Utils.CompressionUtils;
 
 namespace DiscordBot_Jane.Core.Services
@@ -17,19 +19,23 @@ namespace DiscordBot_Jane.Core.Services
         private readonly DiscordSocketClient _discord;
         private readonly CommandService _commands;
         private readonly NotifyIcon _notifyIcon;
+        private readonly IConfigurationRoot _config;
+
+        private static ReaderWriterLock rwl = new ReaderWriterLock();
 
         public string LogDirectory { get; }
         public string LogFile => GetLogFile(DateTime.Now);
 
         // DiscordSocketClient and CommandService are injected automatically from the IServiceProvider.
-        public LoggingService(DiscordSocketClient discord, CommandService commands, NotifyIcon notifyIcon)
+        public LoggingService(DiscordSocketClient discord, CommandService commands, NotifyIcon notifyIcon, IConfigurationRoot config)
         {
             LogDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
 
             _discord = discord;
             _commands = commands;
             _notifyIcon = notifyIcon;
-
+            _config = config;
+            
             _discord.Log += OnLogAsync;
             _commands.Log += OnLogAsync;
         }
@@ -68,10 +74,25 @@ namespace DiscordBot_Jane.Core.Services
                 }
             }
 
-            string logText =
-                $"{DateTime.Now:HH:mm:ss.fff} [{severity}] {source}: {message}";
-            // Write the log text to a file.
-            File.AppendAllText(LogFile, logText + "\n");
+            try
+            {
+                rwl.AcquireWriterLock(200);
+                try
+                {
+                    string logText =
+                        $"{DateTime.Now:HH:mm:ss.fff} [{severity}] {source}: {message}";
+                    // Write the log text to a file.
+                    File.AppendAllText(LogFile, logText + "\n");
+                }
+                finally
+                {
+                    rwl.ReleaseWriterLock();
+                }
+            }
+            catch (ApplicationException)
+            {
+                Console.WriteLine("Error: Writer lock request timed out.");
+            }
             
             // Write the log text to the console.
             Console.ForegroundColor = ConsoleColor.Cyan;
@@ -89,9 +110,54 @@ namespace DiscordBot_Jane.Core.Services
             //return Console.Out.WriteLineAsync(logText);
         }
 
-        private Task OnLogAsync(LogMessage msg)
+        public List<IList<object>> GetLogData(bool reverse = false)
         {
-            return LogAsync(msg.Severity, msg.Source, msg.Exception?.ToString() ?? msg.Message);
+            var logs = new List<IList<object>>();
+
+            try
+            {
+                rwl.AcquireReaderLock(200);
+                try
+                {
+                    var rows = File.ReadAllLines(LogFile).ToList();
+                    foreach (var row in rows)
+                    {
+                        var date = row.Split(new[] { ' ' }, 3);
+                        var rowData = new List<object>
+                        {
+                            date[0],
+                            date[1],
+                            date[2]
+                        };
+                        logs.Add(rowData);
+                    }
+                    if (reverse)
+                        logs.Reverse();
+                }
+                finally
+                {
+                    rwl.ReleaseReaderLock();
+                }
+            }
+            catch (ApplicationException)
+            {
+                Console.WriteLine("Error: Reader lock request timed out.");
+            }
+            return logs;
+        }
+
+        private async Task OnLogAsync(LogMessage msg)
+        {
+            if (msg.Exception is CommandException e)
+            {
+                // Inform user about command error.
+                await e.Context.Channel.SendFileAsync($"gifs/{_config["gifs:error_command"] ?? "sweat"}.gif").ConfigureAwait(false);
+                await e.Context.Channel
+                    .SendMessageAsync(
+                        $"... Verkar som om något gick fel... (ser ut som att {e.InnerException?.Message ?? "idk"})")
+                    .ConfigureAwait(false);
+            }
+            await LogAsync(msg.Severity, msg.Source, msg.Exception?.ToString() ?? msg.Message).ConfigureAwait(false);
         }
 
         private ConsoleColor GetLogSeverityColor(LogSeverity severity)
@@ -123,6 +189,8 @@ namespace DiscordBot_Jane.Core.Services
                     return ConsoleColor.Magenta;
                 case nameof(ReminderService):
                     return ConsoleColor.DarkYellow;
+                case nameof(GDocsService):
+                    return ConsoleColor.DarkMagenta;
                 default:
                     return ConsoleColor.Gray;
             }
